@@ -1,0 +1,96 @@
+`timescale 1ns / 1ns
+
+module cordic_tb;
+
+    reg clk;
+    reg reset;
+    reg start;
+    reg signed [31:0] angle;
+
+    wire signed [31:0] cos_out;
+    wire signed [31:0] sin_out;
+    wire done;
+
+    real cos_real;
+    real sin_real;
+
+    cordic uut (
+        .clk(clk),
+        .reset(reset),
+        .start(start),
+        .angle(angle),
+        .cos_out(cos_out),
+        .sin_out(sin_out),
+        .done(done)
+    );
+
+    always #5 clk = ~clk;
+
+    initial begin
+        $dumpfile("dump.vcd");
+        $dumpvars(0, cordic_tb);
+    end
+
+    task probar_angulo;
+
+        input integer angulo;
+
+        begin
+
+            wait(done == 1'b0);
+
+            @(negedge clk);
+
+            angle = angulo * 65536;
+            start = 1'b1;
+
+            @(negedge clk);
+
+            start = 1'b0;
+
+            wait(done == 1'b1);
+
+            #1;
+
+            cos_real = $signed(cos_out) / 65536.0;
+            sin_real = $signed(sin_out) / 65536.0;
+
+            $display(
+                "Angulo = %0d grados | cos = %f | sin = %f",
+                angulo,
+                cos_real,
+                sin_real
+            );
+
+            wait(done == 1'b0);
+
+        end
+
+    endtask
+
+    initial begin
+
+        clk   = 1'b0;
+        reset = 1'b1;
+        start = 1'b0;
+        angle = 32'sd0;
+
+        #20;
+
+        reset = 1'b0;
+
+        @(negedge clk);
+
+        probar_angulo(0);
+        probar_angulo(30);
+        probar_angulo(45);
+        probar_angulo(60);
+        probar_angulo(90);
+
+        #20;
+
+        $finish;
+
+    end
+
+endmodule
