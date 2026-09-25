@@ -1,0 +1,136 @@
+3. Fragmentos importantes del código
+
+3.1 Inicialización del algoritmo
+
+INIT: begin
+
+    x <= K_INV_16;
+    y <= 32'sd0;
+    z <= angle;
+
+    iter <= 4'd0;
+    done <= 1'b0;
+
+    state <= ITERATE;
+
+end
+
+Explicación:
+En el estado INIT se inicializan los valores necesarios para comenzar el algoritmo CORDIC. El registro x recibe el valor de compensación K_INV_16, y se inicializa en cero, mientras que z recibe el ángulo de entrada.
+
+Además, el contador iter se coloca en cero para comenzar desde la primera iteración. Una vez inicializados los valores, la máquina de estados pasa al estado ITERATE.
+
+
+3.2 Tabla de ángulos
+
+function signed [31:0] atan_tabla;
+
+    input [3:0] index;
+
+    begin
+        case (index)
+
+            4'd0:  atan_tabla = 32'sh002D0000;
+            4'd1:  atan_tabla = 32'sh001A90A7;
+            4'd2:  atan_tabla = 32'sh000E0947;
+            4'd3:  atan_tabla = 32'sh00072001;
+
+            ...
+
+            4'd15: atan_tabla = 32'sh00000073;
+
+            default:
+                atan_tabla = 32'sd0;
+
+        endcase
+    end
+
+endfunction
+
+assign atan_valor = atan_tabla(iter);
+
+Explicación:
+La función atan_tabla almacena los valores de los ángulos utilizados por CORDIC en cada iteración.
+
+Cada valor corresponde a:
+
+alpha_i = arctan(2^-i)
+
+El valor de iter se utiliza como índice para seleccionar el ángulo correspondiente. Por ejemplo, cuando iter = 0 se selecciona un ángulo de 45 grados, mientras que en las siguientes iteraciones se utilizan ángulos cada vez menores.
+
+Los valores se encuentran almacenados utilizando representación Q16.16.
+
+
+3.3 Operación principal de CORDIC
+
+assign x_shifted = x >>> iter;
+assign y_shifted = y >>> iter;
+
+assign x_next =
+    (z >= 0)
+    ? x - y_shifted
+    : x + y_shifted;
+
+assign y_next =
+    (z >= 0)
+    ? y + x_shifted
+    : y - x_shifted;
+
+assign z_next =
+    (z >= 0)
+    ? z - atan_valor
+    : z + atan_valor;
+
+Explicación:
+Primero se realizan desplazamientos aritméticos sobre x y y. Estos desplazamientos permiten implementar las multiplicaciones por 2^-i necesarias en CORDIC sin utilizar multiplicadores.
+
+Luego, el signo del ángulo residual z determina el sentido de la rotación.
+
+Si z >= 0:
+x_next = x - y_shifted
+y_next = y + x_shifted
+z_next = z - atan_valor
+
+Si z < 0:
+x_next = x + y_shifted
+y_next = y - x_shifted
+z_next = z + atan_valor
+
+De esta manera, en cada iteración el valor de z se aproxima progresivamente a cero mientras se actualizan los valores de x e y.
+
+
+3.4 Control de las 16 iteraciones
+
+ITERATE: begin
+
+    x <= x_next;
+    y <= y_next;
+    z <= z_next;
+
+    if (iter == 4'd15) begin
+
+        cos_out <= x_next;
+        sin_out <= y_next;
+
+        state <= DONE;
+
+    end
+    else begin
+
+        iter <= iter + 1'b1;
+        state <= ITERATE;
+
+    end
+
+end
+
+Explicación:
+En el estado ITERATE se actualizan los registros x, y y z con los valores calculados para la siguiente iteración.
+
+El contador iter comienza en 0 y llega hasta 15, por lo que se realizan 16 iteraciones en total.
+
+Mientras no se haya llegado a la última iteración, el contador aumenta en uno y la FSM permanece en el estado ITERATE.
+
+Cuando iter = 15, se ejecuta la última iteración y los valores x_next y y_next se almacenan en cos_out y sin_out, respectivamente.
+
+Finalmente, la máquina de estados pasa al estado DONE.
