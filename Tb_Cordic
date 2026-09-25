@@ -24,12 +24,14 @@ module cordic_tb;
         .done(done)
     );
 
-    always #5 clk = ~clk;
+    always #4 clk = ~clk;
+
 
     initial begin
         $dumpfile("dump.vcd");
         $dumpvars(0, cordic_tb);
     end
+
 
     task probar_angulo;
 
@@ -42,6 +44,7 @@ module cordic_tb;
             @(negedge clk);
 
             angle = angulo * 65536;
+
             start = 1'b1;
 
             @(negedge clk);
@@ -68,6 +71,7 @@ module cordic_tb;
 
     endtask
 
+
     initial begin
 
         clk   = 1'b0;
@@ -75,11 +79,9 @@ module cordic_tb;
         start = 1'b0;
         angle = 32'sd0;
 
-        #20;
+        #16;
 
         reset = 1'b0;
-
-        @(negedge clk);
 
         probar_angulo(0);
         probar_angulo(30);
@@ -87,7 +89,7 @@ module cordic_tb;
         probar_angulo(60);
         probar_angulo(90);
 
-        #20;
+        #100;
 
         $finish;
 
